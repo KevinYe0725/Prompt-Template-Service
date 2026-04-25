@@ -1,0 +1,14 @@
+
+> prompt-template-service-frontend@0.1.0 dev
+> vite --host 0.0.0.0 --port 5175 --strictPort
+
+
+  VITE v5.4.21  ready in 130 ms
+
+  ➜  Local:   http://localhost:5175/
+  ➜  Network: http://192.168.0.121:5175/
+12:52:08 PM [vite] hmr update /src/i18n.tsx
+12:52:08 PM [vite] hmr update /src/components/PromptCard.tsx
+12:52:08 PM [vite] hmr update /src/styles.css
+12:52:08 PM [vite] hmr invalidate /src/i18n.tsx Could not Fast Refresh ("useI18n" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+12:52:08 PM [vite] hmr update /src/App.tsx, /src/pages/PromptListPage.tsx, /src/pages/PromptDetailPage.tsx, /src/pages/PromptEditorPage.tsx, /src/pages/PromptPlaygroundPage.tsx, /src/components/PromptCard.tsx, /src/components/VariableChips.tsx, /src/components/VersionList.tsx, /src/components/MessagePreview.tsx, /src/components/JsonEditor.tsx

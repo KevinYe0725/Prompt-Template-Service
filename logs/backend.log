@@ -1,0 +1,7 @@
+INFO:     Will watch for changes in these directories: ['/Users/kevinye/Projects/Service/prompt_template_service']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [27315] using WatchFiles
+INFO:     Started server process [27331]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:64303 - "GET /api/health HTTP/1.1" 200 OK
