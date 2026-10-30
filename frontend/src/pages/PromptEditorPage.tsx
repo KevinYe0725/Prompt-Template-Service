@@ -5,7 +5,8 @@ import { useToast } from "../components/ToastProvider";
 import { VariableChips } from "../components/VariableChips";
 import { useI18n } from "../i18n";
 import type { PromptCreateRequest, PromptTemplate } from "../types/prompt";
-import { parseVariablesFromMessages } from "../utils/variables";
+import { mergeEditableMessages } from "../utils/editableMessages";
+import { parseVariablesFromMessages, parseVariablesFromText } from "../utils/variables";
 
 type EditorState = {
   name: string;
@@ -14,6 +15,7 @@ type EditorState = {
   task_type: string;
   output_format: "text" | "json" | "markdown";
   description: string;
+  content: string;
   systemPrompt: string;
   userPrompt: string;
   enabled: boolean;
@@ -26,6 +28,7 @@ const emptyState: EditorState = {
   task_type: "question_generation",
   output_format: "json",
   description: "",
+  content: "",
   systemPrompt: "",
   userPrompt: "",
   enabled: false
@@ -43,6 +46,7 @@ function stateFromPrompt(prompt: PromptTemplate, duplicate: boolean): EditorStat
     task_type: prompt.task_type,
     output_format: prompt.output_format,
     description: prompt.description ?? "",
+    content: prompt.content ?? "",
     systemPrompt,
     userPrompt,
     enabled: false
@@ -68,6 +72,7 @@ export function PromptEditorPage({
 
   const isEditing = Boolean(id) && !duplicate;
   const isNewVersion = Boolean(id) && Boolean(duplicate);
+  const isText = basePrompt?.template_type === "text";
 
   useEffect(() => {
     if (!id) {
@@ -94,14 +99,19 @@ export function PromptEditorPage({
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [dirty]);
 
-  const messages = useMemo(
-    () => [
-      { role: "system", content: form.systemPrompt },
-      { role: "user", content: form.userPrompt }
-    ],
-    [form.systemPrompt, form.userPrompt]
+  const messages = useMemo(() => {
+    if (!isEditing || !basePrompt?.messages) {
+      return [
+        { role: "system", content: form.systemPrompt },
+        { role: "user", content: form.userPrompt }
+      ];
+    }
+    return mergeEditableMessages(basePrompt.messages, form.systemPrompt, form.userPrompt);
+  }, [isEditing, basePrompt, form.systemPrompt, form.userPrompt]);
+  const variables = useMemo(
+    () => isText ? parseVariablesFromText(form.content) : parseVariablesFromMessages(messages),
+    [isText, form.content, messages]
   );
-  const variables = useMemo(() => parseVariablesFromMessages(messages), [messages]);
 
   function update<K extends keyof EditorState>(key: K, value: EditorState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -115,7 +125,7 @@ export function PromptEditorPage({
       if (isNewVersion && id) {
         const created = await promptApi.createPromptVersion(id, {
           version: form.version,
-          messages,
+          ...(isText ? { content: form.content } : { messages }),
           description: form.description,
           enabled: form.enabled
         });
@@ -128,8 +138,7 @@ export function PromptEditorPage({
           task_type: form.task_type,
           output_format: form.output_format,
           description: form.description,
-          template_type: "chat",
-          messages
+          ...(isText ? { template_type: "text" as const, content: form.content } : { template_type: "chat" as const, messages })
         });
         showToast(t("toast.promptSaved"));
         setDirty(false);
@@ -260,7 +269,7 @@ export function PromptEditorPage({
             <input value={form.description} onChange={(event) => update("description", event.target.value)} />
           </label>
 
-          <div className="ai-draft-panel">
+          {!isText && <div className="ai-draft-panel">
             <div>
               <h2>{t("editor.aiDraftTitle")}</h2>
               <p>{t("editor.aiDraftCopy")}</p>
@@ -274,8 +283,17 @@ export function PromptEditorPage({
               <Sparkles size={17} />
               {generatingDraft ? t("editor.generatingDraft") : t("editor.generateDraft")}
             </button>
-          </div>
+          </div>}
 
+          {isText ? <label>
+            <span>{t("editor.textContent")}</span>
+            <textarea
+              className="prompt-textarea"
+              value={form.content}
+              onChange={(event) => update("content", event.target.value)}
+              required
+            />
+          </label> : <>
           <label>
             <span>{t("editor.systemPrompt")}</span>
             <textarea
@@ -295,6 +313,7 @@ export function PromptEditorPage({
               required
             />
           </label>
+          </>}
 
           <div className="toolbar sticky-actions">
             {isEditing && (
@@ -315,8 +334,8 @@ export function PromptEditorPage({
           <div className="side-note">
             {t("editor.variableHelp", { placeholder: "{{variable_name}}" })}
           </div>
-          <h2>{t("editor.messages")}</h2>
-          <pre className="code-block">{JSON.stringify(messages, null, 2)}</pre>
+          <h2>{isText ? t("editor.textContent") : t("editor.messages")}</h2>
+          <pre className="code-block">{isText ? form.content : JSON.stringify(messages, null, 2)}</pre>
         </aside>
       </form>
     </main>

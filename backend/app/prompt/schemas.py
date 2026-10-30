@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 TemplateType = Literal["chat", "text"]
@@ -45,6 +45,15 @@ class PromptTemplateVersionCreateRequest(BaseModel):
     messages: Any | None = None
     description: str | None = Field(default=None, max_length=500)
     enabled: bool = False
+
+
+class PromptTemplateDuplicateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def normalize_name(cls, value: Any) -> Any:
+        return value.strip() if isinstance(value, str) else value
 
 
 class PromptTemplateResponse(BaseModel):

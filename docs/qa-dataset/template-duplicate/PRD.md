@@ -21,7 +21,7 @@
 | BR-03 | 根据 ID 复制指定版本；来源不存在返回 404。无论来源是否启用，新记录均使用独立 ID、数据库生成的创建/更新时间、规范版本 `v1` 和 `enabled=false`，不调用激活逻辑；来源的内容、更新时间及启用状态均不因复制改变。 |
 | BR-04 | 新记录复制 `scenario`、`task_type`、`template_type`、`content`、`messages`、`output_format`、`description`。按现有 payload 校验器处理类型与内容，重新解析 `variables`，chat 的 messages 含嵌套扩展数据也必须独立；不复制 `created_by` 或渲染日志。来源 payload 无法通过现有校验时为 400，不创建记录。 |
 | BR-05 | 目标名称下只要存在任意版本，即返回 409，不能插入新记录或改变任何来源/已有版本。依赖数据库当前名称比较规则；在两个复制请求竞争同一 `v1` 时现有 `(name, version)` 唯一约束可阻止两个成功。另一个创建不同版本的并发事务可能与名称检查竞争：该数据库模型没有名称组唯一约束，本次不保证跨版本并发强一致。 |
-| BR-06 | 成功返回 201 和完整新模板；界面跳转到新记录详情，显示未启用 v1。对新名称 `version=active` 渲染在启用之前返回 404；按 ID 预览和编辑可用，主动启用后 active 渲染可用。复制、预览、编辑不需要 AI API key。 |
+| BR-06 | 成功返回 201 和完整新模板；界面跳转到新记录详情，显示未启用 v1。对新名称 `version=active` 渲染在启用之前返回 404；按 ID 预览和编辑可用，主动启用后 active 渲染可用。text 编辑保留 text 类型；chat 当前版本编辑只修改界面中第一条 system/user 的内容，保留其他消息及嵌套扩展字段。复制、预览、编辑不需要 AI API key。 |
 | BR-07 | 重复提交相同名称返回 409，第一次成功结果仍保留；请求错误不得造成部分创建。原有按名称创建新版本的 API 与 UI 路径保持可用。 |
 
 ## UI 与接口状态
@@ -42,4 +42,4 @@
 
 ## 设计取舍与来源
 
-方案 A 在详情页直接调用新端点创建未启用模板；方案 B 复用新建编辑器并让用户重新保存。选择 A：服务器复制完整结构并保留来源，避免编辑器只处理部分 message 字段导致静默丢失；保留现有编辑新版本路径。规格参考基线的 `backend/app/prompt/{models,schemas,service,router}.py`、`frontend/src/pages/{PromptDetailPage,PromptEditorPage}.tsx` 和 `README.md`。最终业务规则由用户或其指定产品负责人负责；该数据集的规则是本次受托设计，未记录虚构审批。
+方案 A 在详情页直接调用新端点创建未启用模板；方案 B 复用新建编辑器并让用户重新保存。选择 A：服务器复制完整结构并保留来源，避免编辑器只处理部分 message 字段导致静默丢失；保留现有编辑新版本路径。实现期间用浏览器复现了原 chat 编辑器保存时丢弃其他消息及扩展字段，因而将当前版本编辑的数据保留列入 BR-06；新版本路径保持原有语义。规格参考基线的 `backend/app/prompt/{models,schemas,service,router}.py`、`frontend/src/pages/{PromptDetailPage,PromptEditorPage}.tsx` 和 `README.md`。最终业务规则由用户或其指定产品负责人负责；该数据集的规则是本次受托设计，未记录虚构审批。

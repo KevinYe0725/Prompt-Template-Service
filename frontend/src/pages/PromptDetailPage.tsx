@@ -1,12 +1,17 @@
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { CopyPlus, Edit3, Play, Power } from "lucide-react";
-import { promptApi } from "../api/promptApi";
+import { PromptApiError, promptApi } from "../api/promptApi";
 import { MessagePreview } from "../components/MessagePreview";
 import { useToast } from "../components/ToastProvider";
 import { VariableChips } from "../components/VariableChips";
 import { VersionList } from "../components/VersionList";
 import { useI18n } from "../i18n";
 import type { PromptTemplate, PromptTemplateListItem } from "../types/prompt";
+
+// Match Python str.strip(), including whitespace not covered by JavaScript trim().
+function normalizeName(name: string) {
+  return name.replace(/^[\u0009-\u000d\u001c-\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+|[\u0009-\u000d\u001c-\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+$/g, "");
+}
 
 export function PromptDetailPage({
   id,
@@ -20,6 +25,13 @@ export function PromptDetailPage({
   const [prompt, setPrompt] = useState<PromptTemplate | null>(null);
   const [versions, setVersions] = useState<PromptTemplateListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
+  const [duplicateName, setDuplicateName] = useState("");
+  const [duplicateError, setDuplicateError] = useState("");
+  const [duplicatePending, setDuplicatePending] = useState(false);
+  const duplicatePendingRef = useRef(false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
 
   async function load() {
     setLoading(true);
@@ -40,6 +52,46 @@ export function PromptDetailPage({
   useEffect(() => {
     void load();
   }, [id]);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (duplicateOpen && dialog && !dialog.open) {
+      dialog.showModal();
+      nameRef.current?.focus();
+    } else if (!duplicateOpen && dialog?.open) {
+      dialog.close();
+    }
+  }, [duplicateOpen]);
+
+  async function duplicate(event: FormEvent) {
+    event.preventDefault();
+    if (duplicatePendingRef.current) return;
+    const name = normalizeName(duplicateName);
+    if (!name || Array.from(name).length > 100) {
+      setDuplicateError(t("duplicate.invalidName"));
+      return;
+    }
+    duplicatePendingRef.current = true;
+    setDuplicatePending(true);
+    setDuplicateError("");
+    try {
+      const created = await promptApi.duplicatePrompt(id, name);
+      setDuplicateOpen(false);
+      showToast(t("duplicate.created"));
+      navigate(`/admin/prompts/${created.id}`);
+    } catch (error) {
+      setDuplicateError(
+        error instanceof PromptApiError && error.status === 409
+          ? t("duplicate.nameTaken")
+          : error instanceof PromptApiError && error.status === 422
+            ? t("duplicate.invalidName")
+            : error instanceof Error ? error.message : t("duplicate.failed")
+      );
+    } finally {
+      duplicatePendingRef.current = false;
+      setDuplicatePending(false);
+    }
+  }
 
   async function activate(versionId = id) {
     if (!window.confirm(t("confirm.activate"))) {
@@ -88,6 +140,14 @@ export function PromptDetailPage({
             <CopyPlus size={17} />
             {t("detail.duplicate")}
           </button>
+          <button className="secondary-button" type="button" onClick={() => {
+            setDuplicateName(`${prompt.name}-copy`);
+            setDuplicateError("");
+            setDuplicateOpen(true);
+          }}>
+            <CopyPlus size={17} />
+            {t("duplicate.action")}
+          </button>
           <button className="primary-button" type="button" onClick={() => navigate(`/admin/prompts/${id}/playground`)}>
             <Play size={17} />
             {t("detail.playground")}
@@ -100,6 +160,42 @@ export function PromptDetailPage({
           )}
         </div>
       </section>
+
+      <dialog
+        className="duplicate-dialog"
+        ref={dialogRef}
+        aria-labelledby="duplicate-title"
+        aria-describedby="duplicate-hint"
+        onCancel={(event) => {
+          event.preventDefault();
+          if (!duplicatePending) setDuplicateOpen(false);
+        }}
+      >
+        <form onSubmit={duplicate} noValidate>
+          <h2 id="duplicate-title">{t("duplicate.title")}</h2>
+          <p id="duplicate-hint">{t("duplicate.hint", { version: prompt.version })}</p>
+          <label>
+            <span>{t("editor.name")}</span>
+            <input
+              ref={nameRef}
+              value={duplicateName}
+              onChange={(event) => { setDuplicateName(event.target.value); setDuplicateError(""); }}
+              disabled={duplicatePending}
+              aria-invalid={Boolean(duplicateError)}
+              aria-describedby={duplicateError ? "duplicate-error" : undefined}
+            />
+          </label>
+          {duplicateError && <p id="duplicate-error" className="inline-error" role="alert">{duplicateError}</p>}
+          <div className="toolbar duplicate-actions">
+            <button className="secondary-button" type="button" disabled={duplicatePending} onClick={() => setDuplicateOpen(false)}>
+              {t("duplicate.cancel")}
+            </button>
+            <button className="primary-button" type="submit" disabled={duplicatePending}>
+              {duplicatePending ? t("duplicate.pending") : t("duplicate.submit")}
+            </button>
+          </div>
+        </form>
+      </dialog>
 
       <section className="detail-grid">
         <div className="glass-panel">

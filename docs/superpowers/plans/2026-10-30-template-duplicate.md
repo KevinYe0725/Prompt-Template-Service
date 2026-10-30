@@ -24,6 +24,7 @@
 - Padded Unicode and names at/above 100 code points: test normalized boundary, blank and wrong types.
 - Disabled clone must preview but not resolve as active until activation: API test both states.
 - Existing editor is chat-only: browser-check editing copied text and ensure save does not change type.
+- Current chat editor discarded unexposed messages/metadata: preserve them when editing a current version and test representative nested data; keep new-version behavior.
 
 ---
 
@@ -40,13 +41,14 @@
 
 ### Task 2: Detail action and editor
 
-**Files:** Modify `frontend/src/api/promptApi.ts`, `frontend/src/pages/PromptDetailPage.tsx`, `frontend/src/pages/PromptEditorPage.tsx`, `frontend/src/i18n.tsx`, `frontend/src/styles.css`; update `README.md` for endpoint and behavior.
+**Files:** Modify `frontend/src/api/promptApi.ts`, `frontend/src/pages/PromptDetailPage.tsx`, `frontend/src/pages/PromptEditorPage.tsx`, `frontend/src/i18n.tsx`, `frontend/src/styles.css`, `frontend/vite.config.ts`; add `frontend/src/utils/editableMessages.ts` and `frontend/tests/editable-messages.test.mjs`; update `README.md` for endpoint and behavior.
 
 **Interfaces:** `promptApi.duplicatePrompt(id: number, name: string): Promise<PromptTemplate>`. Existing detail route is `/admin/prompts/{id}`.
 
 - [ ] Add separate accessible dialog with editable suggested name, normalized validation matching backend, pending state, inline errors, cancel and success navigation. Preserve new-version action.
 - [ ] Adapt editing of an existing text template so its text content and type survive saving; do not invoke AI.
-- [ ] Run `npm ci` and `npm run build` in `frontend`; expect TypeScript and Vite build success.
+- [ ] Preserve unexposed message roles and nested fields when editing the current chat version; `npm test` verifies representative edits and missing-role cases.
+- [ ] Add optional `VITE_DEV_API_PROXY_TARGET`, retaining `http://localhost:8000` default; run `npm ci` and `npm run build` in `frontend`.
 - [ ] Use a real browser against isolated backend/frontend to exercise cancel, invalid input, conflict, success, preview and edit; document exact results and any uncovered behavior.
 
 ### Task 3: Durable handoff and verification

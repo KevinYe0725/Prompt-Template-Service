@@ -18,6 +18,7 @@ from backend.app.prompt.schemas import (
     PromptRenderRequest,
     PromptRenderResponse,
     PromptTemplateCreateRequest,
+    PromptTemplateDuplicateRequest,
     PromptTemplateListItem,
     PromptTemplateListResponse,
     PromptTemplateResponse,
@@ -160,6 +161,17 @@ def create_template_version(
 ) -> PromptTemplateResponse:
     try:
         return _service(db).create_new_version(template_id, request)
+    except Exception as exc:
+        _raise_prompt_error(exc)
+        raise
+
+
+@router.post("/{template_id}/duplicate", response_model=PromptTemplateResponse, status_code=201)
+def duplicate_template(
+    template_id: int, request: PromptTemplateDuplicateRequest, db: DbSession
+) -> PromptTemplateResponse:
+    try:
+        return _service(db).duplicate_template(template_id, request)
     except Exception as exc:
         _raise_prompt_error(exc)
         raise
