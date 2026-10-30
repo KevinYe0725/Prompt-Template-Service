@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 from sqlalchemy import Select, func, select, update
@@ -22,6 +23,7 @@ from backend.app.prompt.schemas import (
     PromptTestVariablesGenerateRequest,
     PromptTestVariablesGenerateResponse,
     PromptTemplateCreateRequest,
+    PromptTemplateDuplicateRequest,
     PromptTemplateListItem,
     PromptTemplateListResponse,
     PromptTemplateResponse,
@@ -240,6 +242,45 @@ class PromptTemplateService:
 
     def get_template(self, template_id: int) -> PromptTemplateResponse:
         return _to_template_response(self._get_template_model(template_id))
+
+    def duplicate_template(
+        self, template_id: int, request: PromptTemplateDuplicateRequest
+    ) -> PromptTemplateResponse:
+        base = self._get_template_model(template_id)
+        exists = self.db.scalar(
+            select(PromptTemplate.id).where(PromptTemplate.name == request.name)
+        )
+        if exists:
+            raise DuplicatePromptTemplateError(
+                f"Prompt template name {request.name} already exists"
+            )
+
+        content, messages, variables = _prepare_template_payload(
+            base.template_type, base.content, deepcopy(base.messages)
+        )
+        template = PromptTemplate(
+            name=request.name,
+            version="v1",
+            scenario=base.scenario,
+            task_type=base.task_type,
+            template_type=base.template_type,
+            content=content,
+            messages=messages,
+            variables=variables,
+            output_format=base.output_format,
+            enabled=False,
+            description=base.description,
+        )
+        self.db.add(template)
+        try:
+            self.db.commit()
+        except IntegrityError as exc:
+            self.db.rollback()
+            raise DuplicatePromptTemplateError(
+                f"Prompt template name {request.name} already exists"
+            ) from exc
+        self.db.refresh(template)
+        return _to_template_response(template)
 
     def update_template(
         self, template_id: int, request: PromptTemplateUpdateRequest

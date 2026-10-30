@@ -113,6 +113,13 @@ export const promptApi = {
     });
   },
 
+  duplicatePrompt(id: number, name: string) {
+    return request<PromptTemplate>(`/api/prompts/${id}/duplicate`, {
+      method: "POST",
+      body: JSON.stringify({ name })
+    });
+  },
+
   activatePrompt(id: number) {
     return request<{ success: boolean; active_template_id: number; name: string; version: string }>(
       `/api/prompts/${id}/activate`,

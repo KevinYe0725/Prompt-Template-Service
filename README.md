@@ -342,6 +342,7 @@ backend/app/ai_client/client.py
 | `GET` | `/api/prompts` | 查询模板列表 |
 | `GET` | `/api/prompts/{id}` | 查询模板详情 |
 | `PUT` | `/api/prompts/{id}` | 更新模板当前版本 |
+| `POST` | `/api/prompts/{id}/duplicate` | 将指定版本复制为独立的新模板 |
 | `POST` | `/api/prompts/{id}/versions` | 基于当前模板创建新版本 |
 | `GET` | `/api/prompts/{id}/versions` | 查询同名模板所有版本 |
 | `POST` | `/api/prompts/{id}/activate` | 启用某个版本 |
@@ -549,6 +550,20 @@ curl -X POST http://localhost:8000/api/prompts/1/versions \
 - `task_type`
 - `template_type`
 - `output_format`
+
+## 复制为新模板
+
+从详情页选择“复制为新模板”，或发送：
+
+```bash
+curl -X POST http://localhost:8000/api/prompts/1/duplicate \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"interview_support"}'
+```
+
+名称会去除首尾空白，处理后须为 1–100 个 Unicode 字符；源不存在返回 404，名称不合法或请求结构错误返回 422，目标名称已存在任意版本返回 409。来源内容不变，新模板从未启用的 `v1` 开始，复制内容和元信息并重新识别变量，不复制原作者及渲染日志。可直接预览或编辑，启用前不能通过 `active` 渲染。来源内容不符合现有模板规则时返回 400。
+
+数据库只对 `(name, version)` 建唯一约束。检查到的现有名称会被拒绝，两个复制请求也不能同时创建同名 `v1`；但与其他接口并发创建同名不同版本时不能保证名称全局独占。名称比较依赖数据库 collation。
 
 ## 启用版本
 
@@ -766,6 +781,7 @@ http://localhost:5175/admin/prompts
 - 查看同名模板的所有版本。
 - 编辑当前版本。
 - 复制为新版本。
+- 将当前版本复制为独立的新模板。
 - 进入 Playground。
 - 启用当前版本。
 
@@ -973,6 +989,13 @@ python3 -m compileall backend
 ```bash
 cd frontend
 npm run build
+```
+
+前端测试包含真实无头 Chrome/Chromium 的交互回归，使用本地隔离 Vite 和受控 HTTP 响应，不访问 AI 服务。先安装 Chrome 或 Chromium；若系统路径无法自动发现，设置 `PROMPT_TEST_CHROMIUM_PATH`：
+
+```bash
+cd frontend
+npm test
 ```
 
 后端健康检查：
