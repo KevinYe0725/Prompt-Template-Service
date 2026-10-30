@@ -17,7 +17,7 @@ export function mergeEditableMessages(
     }
     return message;
   });
-  if (!hasSystem) result.unshift({ role: "system", content: systemContent });
-  if (!hasUser) result.push({ role: "user", content: userContent });
+  if (!hasSystem && systemContent !== "") result.unshift({ role: "system", content: systemContent });
+  if (!hasUser && userContent !== "") result.push({ role: "user", content: userContent });
   return result;
 }

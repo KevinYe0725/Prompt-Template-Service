@@ -68,6 +68,9 @@ const translations = {
     "duplicate.failed": "复制模板失败，请重试。",
 
     "editor.newVersion": "新版本",
+    "editor.loading": "正在加载模板...",
+    "editor.loadFailed": "加载模板失败，请重试。",
+    "editor.retry": "重试",
     "editor.editPrompt": "编辑模板",
     "editor.newPrompt": "新建模板",
     "editor.duplicateTitle": "复制模板",
@@ -215,6 +218,9 @@ const translations = {
     "duplicate.failed": "Could not duplicate the template. Try again.",
 
     "editor.newVersion": "New version",
+    "editor.loading": "Loading prompt...",
+    "editor.loadFailed": "Could not load the template. Try again.",
+    "editor.retry": "Retry",
     "editor.editPrompt": "Edit prompt",
     "editor.newPrompt": "New prompt",
     "editor.duplicateTitle": "Duplicate Prompt",

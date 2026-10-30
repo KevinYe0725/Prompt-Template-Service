@@ -25,6 +25,8 @@
 - Disabled clone must preview but not resolve as active until activation: API test both states.
 - Existing editor is chat-only: browser-check editing copied text and ensure save does not change type.
 - Current chat editor discarded unexposed messages/metadata: preserve them when editing a current version and test representative nested data; keep new-version behavior.
+- Existing empty content and absent chat roles: test unchanged saving and adding only the nonempty role through the real UI.
+- Out-of-order detail/editor fetches, failed loads and an open dialog during ID change: defer HTTP responses in a real browser and verify displayed/saved/duplicated IDs and retry.
 
 ---
 
@@ -48,6 +50,7 @@
 - [ ] Add separate accessible dialog with editable suggested name, normalized validation matching backend, pending state, inline errors, cancel and success navigation. Preserve new-version action.
 - [ ] Adapt editing of an existing text template so its text content and type survive saving; do not invoke AI.
 - [ ] Preserve unexposed message roles and nested fields when editing the current chat version; `npm test` verifies representative edits and missing-role cases.
+- [ ] Guard detail/editor by current ID and request lifecycle, reset the dialog when the ID changes, and reject stale load/save outcomes; preserve empty messages and show a retry on editor load failure.
 - [ ] Add optional `VITE_DEV_API_PROXY_TARGET`, retaining `http://localhost:8000` default; run `npm ci` and `npm run build` in `frontend`.
 - [ ] Use a real browser against isolated backend/frontend to exercise cancel, invalid input, conflict, success, preview and edit; document exact results and any uncovered behavior.
 

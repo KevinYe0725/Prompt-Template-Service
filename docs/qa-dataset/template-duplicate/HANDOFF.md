@@ -8,7 +8,7 @@
 
 ## 环境与启动
 
-从本克隆根目录执行：
+使用 Python、Node.js 18+、npm 及本机 Chrome/Chromium。从本克隆根目录执行：
 
 ```bash
 python3 -m venv .venv
@@ -71,7 +71,7 @@ curl -i "http://127.0.0.1:18812/api/prompts/${PROMPT_QA_SOURCE_ID}/duplicate" \
   -H 'Content-Type: application/json' -d '{"name":"  qa-new  "}'
 ```
 
-第一次 201 返回规范化后的 `qa-new`；重复请求 409。空名称 422，不存在的来源 ID 404。浏览器检查时请另验证中英文、长名称、错误后的重试和请求进行中的按钮禁用；网络/请求顺序、日志与数据库状态应作为独立证据记录。
+第一次 201 返回规范化后的 `qa-new`；重复请求 409。空名称 422，不存在的来源 ID 404。浏览器检查时请另验证中英文、长名称和错误后的重试；网络/请求顺序、日志与数据库状态应作为独立证据记录。前端自动化另以受控延迟响应检查提交中按钮禁用，并验证切换 ID、迟到响应与加载失败重试。
 
 ## 自动化检查
 
@@ -81,4 +81,4 @@ curl -i "http://127.0.0.1:18812/api/prompts/${PROMPT_QA_SOURCE_ID}/duplicate" \
 git diff --check
 ```
 
-这些检查针对本地代码和 SQLite；请勿将其视为 MySQL、并发唯一性、生产部署或真实模型验证。
+`npm test` 用 `playwright-core` 启动独立无头 Chrome/Chromium 和随机本地 Vite 端口，不操作已打开的用户浏览器；测试拦截并控制 HTTP 响应，不访问 AI。若未自动找到浏览器，将 `PROMPT_TEST_CHROMIUM_PATH` 指向可执行文件后重跑，例如 `PROMPT_TEST_CHROMIUM_PATH='/path/to/chromium' npm test`。这些检查针对本地代码、受控 HTTP 和 SQLite；请勿将其视为 MySQL、并发唯一性、生产部署或真实模型验证。

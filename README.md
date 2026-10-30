@@ -991,6 +991,13 @@ cd frontend
 npm run build
 ```
 
+前端测试包含真实无头 Chrome/Chromium 的交互回归，使用本地隔离 Vite 和受控 HTTP 响应，不访问 AI 服务。先安装 Chrome 或 Chromium；若系统路径无法自动发现，设置 `PROMPT_TEST_CHROMIUM_PATH`：
+
+```bash
+cd frontend
+npm test
+```
+
 后端健康检查：
 
 ```bash

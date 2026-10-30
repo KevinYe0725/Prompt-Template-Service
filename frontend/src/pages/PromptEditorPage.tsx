@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Save, Sparkles } from "lucide-react";
 import { promptApi } from "../api/promptApi";
 import { useToast } from "../components/ToastProvider";
@@ -69,25 +69,47 @@ export function PromptEditorPage({
   const [saving, setSaving] = useState(false);
   const [generatingDraft, setGeneratingDraft] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [loadState, setLoadState] = useState<{
+    id?: number; duplicate: boolean; status: "loading" | "ready" | "error";
+  }>({ id, duplicate: Boolean(duplicate), status: id ? "loading" : "ready" });
+  const [retryKey, setRetryKey] = useState(0);
+  const currentIdRef = useRef(id);
+  const loadGenerationRef = useRef(0);
+  currentIdRef.current = id;
 
   const isEditing = Boolean(id) && !duplicate;
   const isNewVersion = Boolean(id) && Boolean(duplicate);
-  const isText = basePrompt?.template_type === "text";
+  const isText = Boolean(id && basePrompt?.id === id && basePrompt.template_type === "text");
 
   useEffect(() => {
+    const generation = ++loadGenerationRef.current;
+    const mode = Boolean(duplicate);
+    const isCurrent = () => loadGenerationRef.current === generation && currentIdRef.current === id;
+    setBasePrompt(null);
+    setForm(emptyState);
+    setDirty(false);
+    setSaving(false);
     if (!id) {
-      setForm(emptyState);
-      return;
+      setLoadState({ id, duplicate: mode, status: "ready" });
+    } else {
+      setLoadState({ id, duplicate: mode, status: "loading" });
+      promptApi
+        .getPrompt(id)
+        .then((prompt) => {
+          if (!isCurrent()) return;
+          if (prompt.id !== id) throw new Error("Unexpected prompt ID");
+          setBasePrompt(prompt);
+          setForm(stateFromPrompt(prompt, mode));
+          setLoadState({ id, duplicate: mode, status: "ready" });
+        })
+        .catch(() => {
+          if (isCurrent()) setLoadState({ id, duplicate: mode, status: "error" });
+        });
     }
-    promptApi
-      .getPrompt(id)
-      .then((prompt) => {
-        setBasePrompt(prompt);
-        setForm(stateFromPrompt(prompt, Boolean(duplicate)));
-        setDirty(false);
-      })
-      .catch((error) => showToast(error instanceof Error ? error.message : t("toast.loadPromptFailed"), "error"));
-  }, [id, duplicate]);
+    return () => {
+      if (loadGenerationRef.current === generation) loadGenerationRef.current += 1;
+    };
+  }, [id, duplicate, retryKey]);
 
   useEffect(() => {
     function handleBeforeUnload(event: BeforeUnloadEvent) {
@@ -120,6 +142,9 @@ export function PromptEditorPage({
 
   async function save(event: FormEvent) {
     event.preventDefault();
+    if (id && (basePrompt?.id !== id || loadState.id !== id || loadState.duplicate !== Boolean(duplicate) || loadState.status !== "ready")) return;
+    const generation = loadGenerationRef.current;
+    const isCurrent = () => currentIdRef.current === id && loadGenerationRef.current === generation;
     setSaving(true);
     try {
       if (isNewVersion && id) {
@@ -129,6 +154,7 @@ export function PromptEditorPage({
           description: form.description,
           enabled: form.enabled
         });
+        if (!isCurrent()) return;
         showToast(t("toast.newVersionSaved"));
         setDirty(false);
         navigate(`/admin/prompts/${created.id}`);
@@ -140,6 +166,7 @@ export function PromptEditorPage({
           description: form.description,
           ...(isText ? { template_type: "text" as const, content: form.content } : { template_type: "chat" as const, messages })
         });
+        if (!isCurrent()) return;
         showToast(t("toast.promptSaved"));
         setDirty(false);
         navigate(`/admin/prompts/${updated.id}`);
@@ -156,14 +183,15 @@ export function PromptEditorPage({
           description: form.description
         };
         const created = await promptApi.createPrompt(payload);
+        if (!isCurrent()) return;
         showToast(t("toast.promptCreated"));
         setDirty(false);
         navigate(`/admin/prompts/${created.id}`);
       }
     } catch (error) {
-      showToast(error instanceof Error ? error.message : t("toast.savePromptFailed"), "error");
+      if (isCurrent()) showToast(error instanceof Error ? error.message : t("toast.savePromptFailed"), "error");
     } finally {
-      setSaving(false);
+      if (isCurrent()) setSaving(false);
     }
   }
 
@@ -198,6 +226,22 @@ export function PromptEditorPage({
     } finally {
       setGeneratingDraft(false);
     }
+  }
+
+  if (id && (basePrompt?.id !== id || loadState.id !== id || loadState.duplicate !== Boolean(duplicate) || loadState.status !== "ready")) {
+    const failed = loadState.id === id && loadState.duplicate === Boolean(duplicate) && loadState.status === "error";
+    return (
+      <main className="page-shell">
+        <div className="empty-panel" role={failed ? "alert" : "status"}>
+          <p>{failed ? t("editor.loadFailed") : t("editor.loading")}</p>
+          {failed && <button className="secondary-button" type="button" onClick={() => setRetryKey((value) => value + 1)}>{t("editor.retry")}</button>}
+        </div>
+      </main>
+    );
+  }
+
+  if (!id && basePrompt) {
+    return <main className="page-shell"><div className="empty-panel" role="status">{t("editor.loading")}</div></main>;
   }
 
   return (
@@ -300,7 +344,7 @@ export function PromptEditorPage({
               className="prompt-textarea"
               value={form.systemPrompt}
               onChange={(event) => update("systemPrompt", event.target.value)}
-              required
+              required={!isEditing}
             />
           </label>
 
@@ -310,7 +354,7 @@ export function PromptEditorPage({
               className="prompt-textarea"
               value={form.userPrompt}
               onChange={(event) => update("userPrompt", event.target.value)}
-              required
+              required={!isEditing}
             />
           </label>
           </>}

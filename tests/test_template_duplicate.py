@@ -130,6 +130,27 @@ def test_text_copy_can_preview_and_edit_without_changing_source(client_and_engin
     assert client.get(f"/api/prompts/{source['id']}").json() == source
 
 
+@pytest.mark.parametrize(
+    "messages",
+    [
+        [{"role": "assistant", "content": "", "metadata": {"tag": "keep"}}],
+        [{"role": "system", "content": ""}, {"role": "user", "content": ""}],
+        [],
+    ],
+)
+def test_copy_retains_valid_empty_and_missing_role_messages(client_and_engine, messages):
+    client, _ = client_and_engine
+    source = create_prompt(client, messages=messages)
+    result = client.post(f"/api/prompts/{source['id']}/duplicate", json={"name": "empty-copy"})
+    assert result.status_code == 201, result.text
+    clone = result.json()
+    assert clone["messages"] == messages
+    updated = client.put(f"/api/prompts/{clone['id']}", json={"messages": messages})
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["messages"] == messages
+    assert client.get(f"/api/prompts/{source['id']}").json() == source
+
+
 def test_name_conflicts_with_any_version_and_repeated_requests_have_no_side_effects(client_and_engine):
     client, _ = client_and_engine
     source = create_prompt(client)

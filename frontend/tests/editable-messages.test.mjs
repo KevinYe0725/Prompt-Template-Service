@@ -27,3 +27,17 @@ test("editing a chat lacking system and user retains its existing messages", () 
     { role: "user", content: "question" }
   ]);
 });
+
+test("empty inputs leave absent system and user roles absent", () => {
+  const source = [{ role: "assistant", content: "", metadata: { value: "keep" } }];
+  assert.deepEqual(mergeEditableMessages(source, "", ""), source);
+});
+
+test("existing empty messages remain present without inventing missing roles", () => {
+  const source = [{ role: "user", content: "", metadata: { tag: "empty" } }];
+  assert.deepEqual(mergeEditableMessages(source, "", ""), source);
+});
+
+test("an empty message list stays empty until a role receives content", () => {
+  assert.deepEqual(mergeEditableMessages([], "", ""), []);
+});

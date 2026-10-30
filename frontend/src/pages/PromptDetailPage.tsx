@@ -25,6 +25,7 @@ export function PromptDetailPage({
   const [prompt, setPrompt] = useState<PromptTemplate | null>(null);
   const [versions, setVersions] = useState<PromptTemplateListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [duplicateName, setDuplicateName] = useState("");
   const [duplicateError, setDuplicateError] = useState("");
@@ -32,26 +33,40 @@ export function PromptDetailPage({
   const duplicatePendingRef = useRef(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
-
-  async function load() {
-    setLoading(true);
-    try {
-      const [detail, versionRows] = await Promise.all([
-        promptApi.getPrompt(id),
-        promptApi.listPromptVersions(id)
-      ]);
-      setPrompt(detail);
-      setVersions(versionRows);
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : t("toast.loadPromptFailed"), "error");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const currentIdRef = useRef(id);
+  const loadGenerationRef = useRef(0);
+  currentIdRef.current = id;
 
   useEffect(() => {
-    void load();
-  }, [id]);
+    const generation = ++loadGenerationRef.current;
+    const isCurrent = () => loadGenerationRef.current === generation && currentIdRef.current === id;
+    setLoading(true);
+    setPrompt(null);
+    setVersions([]);
+    setDuplicateOpen(false);
+    setDuplicateError("");
+    setDuplicatePending(false);
+    duplicatePendingRef.current = false;
+    void (async () => {
+      try {
+        const [detail, versionRows] = await Promise.all([
+          promptApi.getPrompt(id),
+          promptApi.listPromptVersions(id)
+        ]);
+        if (!isCurrent()) return;
+        if (detail.id !== id) throw new Error(t("toast.loadPromptFailed"));
+        setPrompt(detail);
+        setVersions(versionRows);
+      } catch (error) {
+        if (isCurrent()) showToast(error instanceof Error ? error.message : t("toast.loadPromptFailed"), "error");
+      } finally {
+        if (isCurrent()) setLoading(false);
+      }
+    })();
+    return () => {
+      if (loadGenerationRef.current === generation) loadGenerationRef.current += 1;
+    };
+  }, [id, reloadKey]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -65,7 +80,10 @@ export function PromptDetailPage({
 
   async function duplicate(event: FormEvent) {
     event.preventDefault();
-    if (duplicatePendingRef.current) return;
+    if (duplicatePendingRef.current || loading || !prompt || prompt.id !== id) return;
+    const sourceId = prompt.id;
+    const generation = loadGenerationRef.current;
+    const isCurrent = () => currentIdRef.current === sourceId && loadGenerationRef.current === generation;
     const name = normalizeName(duplicateName);
     if (!name || Array.from(name).length > 100) {
       setDuplicateError(t("duplicate.invalidName"));
@@ -75,11 +93,13 @@ export function PromptDetailPage({
     setDuplicatePending(true);
     setDuplicateError("");
     try {
-      const created = await promptApi.duplicatePrompt(id, name);
+      const created = await promptApi.duplicatePrompt(sourceId, name);
+      if (!isCurrent()) return;
       setDuplicateOpen(false);
       showToast(t("duplicate.created"));
       navigate(`/admin/prompts/${created.id}`);
     } catch (error) {
+      if (!isCurrent()) return;
       setDuplicateError(
         error instanceof PromptApiError && error.status === 409
           ? t("duplicate.nameTaken")
@@ -88,8 +108,10 @@ export function PromptDetailPage({
             : error instanceof Error ? error.message : t("duplicate.failed")
       );
     } finally {
-      duplicatePendingRef.current = false;
-      setDuplicatePending(false);
+      if (isCurrent()) {
+        duplicatePendingRef.current = false;
+        setDuplicatePending(false);
+      }
     }
   }
 
@@ -97,17 +119,20 @@ export function PromptDetailPage({
     if (!window.confirm(t("confirm.activate"))) {
       return;
     }
+    const generation = loadGenerationRef.current;
+    const isCurrent = () => currentIdRef.current === id && loadGenerationRef.current === generation;
     try {
       await promptApi.activatePrompt(versionId);
+      if (!isCurrent()) return;
       showToast(t("toast.versionActivated"));
-      navigate(`/admin/prompts/${versionId}`);
-      await load();
+      if (versionId === id) setReloadKey((value) => value + 1);
+      else navigate(`/admin/prompts/${versionId}`);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : t("toast.activateFailed"), "error");
+      if (isCurrent()) showToast(error instanceof Error ? error.message : t("toast.activateFailed"), "error");
     }
   }
 
-  if (loading) {
+  if (loading || (prompt && prompt.id !== id)) {
     return <main className="page-shell"><div className="empty-panel">{t("detail.loading")}</div></main>;
   }
 
